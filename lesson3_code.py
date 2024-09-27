@@ -1,11 +1,15 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
+from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
-import seaborn as sns
+from sklearn.model_selection import GridSearchCV
+
 
 
 df = pd.read_csv("data/housing.csv")
@@ -95,17 +99,17 @@ corr_matrix = (X_train.iloc[:,0:-5]).corr()
 sns.heatmap(np.abs(corr_matrix))
 
 corr1 = y_train.corr(X_train['longitude'])
-print(corr1)
+# print(corr1)
 corr2 = y_train.corr(X_train['latitude'])
-print(corr2)
+# print(corr2)
 corr3 = y_train.corr(X_train['total_rooms'])
-print(corr3)
+# print(corr3)
 corr4 = y_train.corr(X_train['total_bedrooms'])
-print(corr4)
+# print(corr4)
 corr5 = y_train.corr(X_train['population'])
-print(corr5)
+# print(corr5)
 corr6 = y_train.corr(X_train['households'])
-print(corr6)
+# print(corr6)
 
 X_train = X_train.drop(['longitude'], axis=1)
 X_train = X_train.drop(['total_bedrooms'], axis=1)
@@ -117,15 +121,71 @@ X_test = X_test.drop(['total_bedrooms'], axis=1)
 X_test = X_test.drop(['population'], axis=1)
 X_test = X_test.drop(['households'], axis=1)
 
-"""Training Model"""
+
+plt.figure()
+corr_matrix_2 = (X_train.iloc[:,0:-5]).corr()
+sns.heatmap(np.abs(corr_matrix_2))
+
+
+
+"""Training First Model"""
 my_model1 = LinearRegression()
 my_model1.fit(X_train, y_train)
-y_pred_test1 = my_model1.predict(X_test)
-mae1 = mean_absolute_error(y_test, y_pred_test1)
-print(mae1)
+y_pred_train1 = my_model1.predict(X_train)
 
+for i in range(5):
+    print("Predictions:", y_pred_train1[i], "Actual values:", y_train[i])
+
+mae_train1 = mean_absolute_error(y_pred_train1, y_train)
+print("Model 1 training MAE is: ", round(mae_train1,2))
+
+
+
+"""Cross Validation Model 1"""
+my_model1 = LinearRegression()
+cv_scores_model1 = cross_val_score(my_model1, X_train, y_train, cv=5, scoring='neg_mean_absolute_error')
+cv_mae1 = -cv_scores_model1.mean()
+print("Model 1 Mean Absolute Error (CV):", round(cv_mae1, 2))
+"""NOTE THAT THERE IS DATA LEAK IN THIS WAY OF IMPLEMENTING CV. WHY?"""
+
+
+"""Training Second Model"""
 my_model2 = RandomForestRegressor(n_estimators=30, random_state=42)
 my_model2.fit(X_train, y_train)
-y_pred_test2 = my_model2.predict(X_test)
-mae2 = mean_absolute_error(y_pred_test2, y_test)
-print(mae2)
+y_pred_train2 = my_model2.predict(X_train)
+mae_train2 = mean_absolute_error(y_pred_train2, y_train)
+print("Model 2 training MAE is: ", round(mae_train2,2))
+
+
+
+"""Cross Validation Model 2"""
+cv_scores_model2 = cross_val_score(my_model2, X_train, y_train, cv=5, scoring='neg_mean_absolute_error')
+cv_mae2 = -cv_scores_model2.mean()
+print("Model 2 Mean Absolute Error (CV):", round(cv_mae2, 2))
+"""NOTE THAT THERE IS DATA LEAK IN THIS WAY OF IMPLEMENTING CV. WHY?"""
+
+
+for i in range(5):
+    print("Mode 1 Predictions:",
+          round(y_pred_train1[i],2),
+          "Mode 2 Predictions:",
+          round(y_pred_train2[i],2),
+          "Actual values:",
+          round(y_train[i],2))
+
+
+"""GridSearchCV"""
+param_grid = {
+    'n_estimators': [10, 30, 50],
+    'max_depth': [None, 10, 20, 30],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4],
+    'max_features': ['sqrt', 'log2']
+}
+my_model3 = RandomForestRegressor(random_state=42)
+grid_search = GridSearchCV(my_model3, param_grid, cv=5, scoring='neg_mean_absolute_error', n_jobs=1)
+grid_search.fit(X_train, y_train)
+best_params = grid_search.best_params_
+print("Best Hyperparameters:", best_params)
+best_model3 = grid_search.best_estimator_
+
